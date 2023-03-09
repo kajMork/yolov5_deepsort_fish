@@ -44,7 +44,18 @@ def extract_image_patch(image, bbox, patch_shape):
         boundaries.
 
     """
-    bbox = np.array(bbox)
+    # Make the initial crop, based on the bounding box.
+    bbox = np.asarray(bbox)
+    x, y, w, h = bbox
+    x1, y1 = int(x), int(y)
+    x2, y2 = int(x + w), int(y + h)
+    patch = image[y1:y2, x1:x2]
+    # Then we rotate the patch 90 deg.
+    patch = np.rot90(patch, 1)
+    # The patch is going to be the new image.
+    image = patch
+    # Adapt the bounding box to the new image.
+    bbox = np.asarray([0, 0, h, w])
     if patch_shape is not None:
         # correct aspect ratio to patch shape
         target_aspect = float(patch_shape[1]) / patch_shape[0]
@@ -64,6 +75,7 @@ def extract_image_patch(image, bbox, patch_shape):
     sx, sy, ex, ey = bbox
     image = image[sy:ey, sx:ex]
     image = cv2.resize(image, tuple(patch_shape[::-1]))
+
     return image
 
 
@@ -103,6 +115,8 @@ def create_box_encoder(model_filename, input_name="images",
         image_patches = []
         for box in boxes:
             patch = extract_image_patch(image, box, image_shape[:2])
+            #cv2.imshow("patch", patch)
+            #cv2.waitKey(0)
             if patch is None:
                 print("WARNING: Failed to extract image patch: %s." % str(box))
                 patch = np.random.uniform(
@@ -174,6 +188,7 @@ def generate_detections(encoder, mot_dir, output_dir, detection_dir=None):
             features = encoder(bgr_image, rows[:, 2:6].copy())
             detections_out += [np.r_[(row, feature)] for row, feature
                                in zip(rows, features)]
+
 
         output_filename = os.path.join(output_dir, "%s.npy" % sequence)
         np.save(
